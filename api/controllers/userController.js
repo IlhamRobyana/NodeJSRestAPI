@@ -1,69 +1,97 @@
-const Pool = require('pg').Pool
-const pool = new Pool({
-	user: 'postgres',
-	host: 'localhost',
-	database: 'restapi_test',
-	password: 'ujangbedil',
-	port: 5432
-})
+const UserService = require('../services/userService');
+const Util = require('../utils/Utils');
 
-exports.getAllUsers = function(request, response) {
-	pool.query('SELECT * FROM users ORDER BY id ASC', (error, results) => {
-		if (error) {
-			throw error
-		}
-		response.status(200).json(results.rows)
-	})
-}
+const util = new Util();
 
-exports.getUser = function(request, response) {
-	const id = parseInt(request.params.id)
-
-	pool.query('SELECT * FROM users WHERE id = $1', [id], (error, results) => {
-		if (error) {
-			throw error
-		}
-
-		response.status(200).json(results.rows)
-	})
-}
-
-exports.updateUser = function(request, response) {
-	const id = parseInt(request.params.id)
-	const { first_name, last_name, age, email } = request.body
-
-	pool.query(
-		'UPDATE users SET first_name = $1, last_name = $2, age = $3, email = $4 WHERE id = $5',
-		[first_name, last_name, age, email, id],
-		(error, results) => {
-			if (error){
-				throw error
+class UserController {
+	static async getAllUsers(req, res) {
+		try {
+			const allUsers = await UserService.getAllUsers();
+			
+			console.log("aaaaaaa");
+			if (allUsers.length > 0) {
+				util.setSuccess(200, 'Users retrieved', allUsers);
+			} else {
+				util.setSuccess(200, 'No user found');
 			}
-			response.status(200).send(`User modified with ID: ${id}`)
+			return util.send(res);
+		} catch (error) {
+			console.log(error);
+			util.setError(400, error);
+			return util.send(res);
 		}
-	)
+	}
+
+	static async getUser(req, res) {
+		const id = parseInt(req.params.id);
+
+		try {
+			console.log(id);
+			const user = await UserService.getUser(id);
+
+			if (!user) {
+				util.setError(404, `cannot find user with id ${id}`);
+			} else {
+				util.setSuccess(200, 'Found user', user);
+			}
+			return util.send(res);
+		} catch (error) {
+			console.log(error);
+			util.setError(404, error);
+		
+		return util.send(res);
+		}
+	}
+	
+	static async createUser(req, res) {
+		const newUser = req.body;
+		try {
+			const createdUser = await UserService.createUser(newUser);
+			util.setSuccess(201, 'User Added!', createdUser);
+			return util.send(res);
+		} catch (error) {
+			util.setError(400, error.message);
+			return util.send(res);
+		}
+	}
+
+	static async updateUser(req,res) {
+		const alteredUser = req.body;
+		const { id } = req.params;
+		try {
+			const updatedUser = await UserService.updateUser(id, alteredUser);
+			if (!updatedUser) {
+				util.setError(404, `cannot find user with id: ${id}`);
+			} else {
+				util.setSuccess(200, 'User updated', updatedUser);
+			}
+			return util.send(res);
+		} catch (error) {
+			console.log(error);
+			util.setError(404, error);
+			return util.send(res);
+		}
+	}
+	
+	static async deleteUser(req, res) {
+		const id = parseInt(req.params.id);
+
+		try {
+			const userToDelete = await UserService.deleteUser(id);
+
+			if (userToDelete) {
+				util.setSuccess(200, 'User deleted');
+			} else {
+				util.setError(404, `User with id ${id} cannot be found`);
+			}
+			return util.send(res);
+		} catch (error) {
+			console.log(error);
+			util.setError(400, error);
+			return util.send(res);
+		}
+	}
+
 }
 
-exports.createUser = function(request, response) {
-	const { first_name, last_name, age, email } = request.body
-
-	pool.query('INSERT INTO users (first_name, last_name, age, email) VALUES ($1, $2, $3, $4)', 
-		[first_name, last_name, age, email], 
-		(error, results) => {
-		if (error) {
-			throw error
-		}
-		response.status(200).json(results.rows)
-	})
-}
-
-exports.deleteUser = function(request, response) {
-	const id = parseInt(request.params.id)
-
-	pool.query('DELETE FROM users WHERE id = $1', [id], (error, results) => {
-		if (error) {
-			throw error
-		}
-		response.status(200).send(`User deleted with ID: ${id}`)
-	})
-}
+module.exports = UserController;
